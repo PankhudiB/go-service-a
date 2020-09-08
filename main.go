@@ -9,8 +9,10 @@ import (
 	"go-service/request"
 	"go-service/tracing"
 	"go.opencensus.io/plugin/ochttp"
+	"go.opencensus.io/trace"
 	"io/ioutil"
 	"net/http"
+	"time"
 )
 
 func main() {
@@ -56,6 +58,11 @@ func callB(ctx *gin.Context, serviceARequest request.HelloARequest) {
 
 func createRequestForB(ctx *gin.Context, serviceARequest request.HelloARequest) (*http.Request, error) {
 	context := ctx.Request.Context()
+	span := trace.FromContext(context)
+	defer span.End()
+	span.Annotate([]trace.Attribute{trace.StringAttribute("Creating request", "for service B")}, "Logs")
+	time.Sleep(time.Millisecond * 1000)
+
 	requestToB := request.HelloBRequest{
 		Sender:  "Service-A",
 		Message: fmt.Sprintf("Just came by to say hii on behalf of %s!", serviceARequest.Sender),
