@@ -1,2 +1,4 @@
-./idea
+.idea/
 ./out
+./go-service
+go-service-a.iml
