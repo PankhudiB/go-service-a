@@ -17,7 +17,13 @@ func main() {
 	tracing.Init("Service A", constants.OCCollector)
 	r := gin.Default()
 	r.POST("/hello-service-A", func(ctx *gin.Context) {
-		handleRequest(ctx)
+		err := handleRequest(ctx)
+		if err != nil {
+			ctx.AbortWithStatus(http.StatusInternalServerError)
+			return
+		}
+		ctx.Status(http.StatusOK)
+		return
 	})
 
 	err := http.ListenAndServe(":8080", tracing.WithTracing(r))
