@@ -1,18 +1,14 @@
 package main
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"go-service/constants"
 	"go-service/request"
 	"go-service/tracing"
 	"go.opencensus.io/plugin/ochttp"
-	"go.opencensus.io/trace"
 	"io/ioutil"
 	"net/http"
-	"time"
 )
 
 func main() {
@@ -31,47 +27,36 @@ func main() {
 
 }
 
-func handleRequest(ctx *gin.Context) {
+func handleRequest(ctx *gin.Context) error {
 	fmt.Println("------------------ Welcome to Service A ------------------")
 	var serviceARequest request.HelloARequest
 	if err := ctx.ShouldBindJSON(&serviceARequest); err != nil {
 		fmt.Println("Error reading request hello A", err.Error())
 	}
 	fmt.Printf("%s said Hello", serviceARequest.Sender)
-	callB(ctx, serviceARequest)
+	err := callB(ctx, serviceARequest)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
-func callB(ctx *gin.Context, serviceARequest request.HelloARequest) {
-	req, err := createRequestForB(ctx, serviceARequest)
+func callB(ctx *gin.Context, serviceARequest request.HelloARequest) error {
+	bRequest := request.NewHelloBRequest("Sender A", fmt.Sprintf("Just came by to say hii on behalf of %s!", serviceARequest.Sender))
+	httpRequest, err := bRequest.CreateHTTPRequest(ctx)
+
 	client := &http.Client{Transport: &ochttp.Transport{}}
-	response, err := client.Do(req)
+	response, err := client.Do(httpRequest)
 	if err != nil {
-		print(err)
+		fmt.Println("Error while requesting service B: ", err.Error())
+		return err
 	}
 	defer response.Body.Close()
 	body, err := ioutil.ReadAll(response.Body)
 	if err != nil {
-		print(err)
+		fmt.Println("Error while reading response from service B: ", err.Error())
+		return err
 	}
 	fmt.Println(string(body))
-}
-
-func createRequestForB(ctx *gin.Context, serviceARequest request.HelloARequest) (*http.Request, error) {
-	context := ctx.Request.Context()
-	span := trace.FromContext(context)
-	defer span.End()
-	span.Annotate([]trace.Attribute{trace.StringAttribute("Creating request", "for service B")}, "Logs")
-	time.Sleep(time.Millisecond * 1000)
-
-	requestToB := request.HelloBRequest{
-		Sender:  "Service-A",
-		Message: fmt.Sprintf("Just came by to say hii on behalf of %s!", serviceARequest.Sender),
-	}
-	requestBody, err := json.Marshal(requestToB)
-	if err != nil {
-		fmt.Println("Unable to marshal request ", err.Error())
-	}
-	req, _ := http.NewRequest("POST", constants.HelloServiceBUrl, bytes.NewBuffer(requestBody))
-	req = req.WithContext(context)
-	return req, err
+	return nil
 }
